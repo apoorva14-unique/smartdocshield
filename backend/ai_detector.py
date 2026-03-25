@@ -1,28 +1,25 @@
 import spacy
 
-nlp = spacy.load("en_core_web_sm")
+try:
+    nlp = spacy.load("en_core_web_sm")
+except:
+    print("⚠️ spaCy model not found, using blank model")
+    nlp = spacy.blank("en")
+
 
 def detect_ai_entities(text):
-
     doc = nlp(text)
 
     names = []
     locations = []
 
     for ent in doc.ents:
-        val = ent.text.strip()
-
-        # remove garbage OCR words
-        if len(val) < 4 or any(char.isdigit() for char in val):
-            continue
-
         if ent.label_ == "PERSON":
-            names.append(val)
-
+            names.append(ent.text)
         elif ent.label_ in ["GPE", "LOC"]:
-            locations.append(val)
+            locations.append(ent.text)
 
     return {
-        "names": list(set(names))[:5],
-        "locations": list(set(locations))[:5]
+        "names": list(set(names)),
+        "locations": list(set(locations))
     }
