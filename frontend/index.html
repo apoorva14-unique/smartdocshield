@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartDocShield | AI Privacy</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- ✅ CHART -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="blob"></div>
+
+    <div class="container">
+
+        <nav>
+            <div class="logo"><i class="fas fa-shield-halved"></i> SmartDocShield</div>
+            <div class="status-tag"><span class="pulse"></span> System Active</div>
+        </nav>
+
+        <header>
+            <h1>Protect Your <span>Unstructured</span> Data</h1>
+            <p>Automated OCR extraction and PII redaction for secure document handling.</p>
+        </header>
+
+        <main>
+
+            <!-- Upload -->
+            <div class="glass-card upload-box" id="dropZone">
+                <i class="fas fa-cloud-arrow-up upload-icon"></i>
+                <h3>Drag & Drop Document</h3>
+                <p>Supports PDF, JPG, PNG</p>
+
+                <input type="file" id="fileInput" hidden accept=".pdf,.png,.jpg,.jpeg">
+
+                <button class="glow-button" id="browseBtn">Browse Files</button>
+
+                <div id="fileName" class="file-name">No file selected</div>
+            </div>
+
+            <!-- Button -->
+            <button class="process-btn" id="uploadBtn">
+                <i class="fas fa-wand-magic-sparkles"></i> Process & Sanitize
+            </button>
+
+            <!-- Result -->
+            <div class="result-container" id="resultArea" style="display:none;">
+                <div class="glass-card">
+
+                    <div class="card-header">
+                        <span><i class="fas fa-terminal"></i> Current Output</span>
+
+                        <div class="btn-group">
+                            <button class="icon-btn" onclick="copyResult()">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                            <button class="icon-btn" onclick="downloadResult()">
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="loading" class="loader-wrapper" style="display:none;">
+                        <div class="cyber-spinner"></div>
+                        <p>AI Engine extracting text...</p>
+                    </div>
+
+                    <pre id="outputText"></pre>
+                </div>
+            </div>
+
+            <!-- ✅ NEW: DASHBOARD -->
+            <section class="vault-section">
+                <div class="glass-card">
+                    <div class="card-header">
+                        <span><i class="fas fa-chart-simple"></i> PII Analytics Dashboard</span>
+                        <span class="badge">LIVE</span>
+                    </div>
+
+                    <canvas id="piiChart" height="120"></canvas>
+                </div>
+            </section>
+
+            <!-- Vault -->
+            <section class="vault-section">
+                <div class="glass-card vault-card">
+                    <div class="card-header">
+                        <span><i class="fas fa-vault"></i> Document Vault</span>
+                        <span class="badge">SECURE HISTORY</span>
+                    </div>
+
+                    <div class="file-list" id="vaultList">
+                        <div class="empty-msg" id="emptyMsg">No documents processed yet.</div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+:root {
+    --bg-dark: #0b1220;
+    --card-bg: rgba(20, 30, 50, 0.7);
+    --primary: #8b5cf6;
+    --secondary: #3b82f6;
+    --accent: #10b981;
+    --text: #f1f5f9;
+}
+
+body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: linear-gradient(135deg, #0b1220, #111827);
+    color: var(--text);
+    margin: 0;
+}
+
+/* Layout */
+.container {
+    max-width: 1000px;
+    margin: auto;
+    padding: 40px 20px;
+}
+
+/* Header */
+header h1 {
+    font-size: 3rem;
+    text-align: center;
+}
+
+header span {
+    background: linear-gradient(90deg, #8b5cf6, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Card */
+.glass-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 30px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+}
+
+/* Upload Box */
+.upload-box {
+    border: 2px dashed rgba(255,255,255,0.2);
+    text-align: center;
+    padding: 40px;
+    transition: 0.3s;
+}
+
+.upload-box:hover {
+    border-color: var(--primary);
+    transform: scale(1.02);
+}
+
+/* Buttons */
+.glow-button {
+    background: linear-gradient(45deg, #8b5cf6, #3b82f6);
+    padding: 12px 25px;
+    border-radius: 10px;
+    border: none;
+    color: white;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.glow-button:hover {
+    transform: scale(1.05);
+}
+
+.process-btn {
+    width: 100%;
+    padding: 15px;
+    border-radius: 12px;
+    border: none;
+    background: linear-gradient(45deg, #10b981, #22c55e);
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* Output */
+#outputText {
+    background: #020617;
+    padding: 15px;
+    border-radius: 10px;
+    color: #22c55e;
+    white-space: pre-wrap;
+}
+
+/* Vault */
+.file-item {
+    background: rgba(255,255,255,0.05);
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+#outputText {
+    background: #020617;
+    border: 1px solid #1e293b;
+    padding: 20px;
+    border-radius: 12px;
+    color: #22c55e;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+body {
+    background: linear-gradient(-45deg, #0b1220, #1e293b, #0b1220);
+    background-size: 400% 400%;
+    animation: gradientMove 10s ease infinite;
+}
+
+@keyframes gradientMove {
+    0% {background-position: 0%}
+    50% {background-position: 100%}
+    100% {background-position: 0%}
+}
+
+.glass-card {
+    box-shadow: 0 0 20px rgba(139,92,246,0.6),
+                0 0 40px rgba(59,130,246,0.4);
+}
+
+#outputText {
+    font-family: "Courier New", monospace;
+}
+
+.input-box {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 8px;
+    border: none;
+    outline: none;
+}
