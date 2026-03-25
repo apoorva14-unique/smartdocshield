@@ -1,0 +1,8 @@
+flask
+flask-cors
+werkzeug
+reportlab
+pytesseract
+opencv-python
+pillow
+spacy
