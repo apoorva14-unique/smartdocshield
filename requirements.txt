@@ -6,3 +6,5 @@ pytesseract
 opencv-python
 pillow
 spacy
+pdf2image
+PyPDF2
