@@ -19,8 +19,12 @@ CORS(app)
 
 app.register_blueprint(auth)
 
+# -------- FOLDERS --------
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
 
 # -------- CREATE PDF --------
 def create_pdf(text, path):
@@ -37,11 +41,11 @@ def create_pdf(text, path):
 # -------- SERVE FRONTEND --------
 @app.route("/")
 def serve_frontend():
-    return send_from_directory("../frontend", "index.html")
+    return send_from_directory(FRONTEND_DIR, "index.html")
 
 @app.route("/<path:path>")
 def static_files(path):
-    return send_from_directory("../frontend", path)
+    return send_from_directory(FRONTEND_DIR, path)
 
 # -------- DOCUMENT TYPE --------
 def classify_document(text):
@@ -70,19 +74,19 @@ def upload_file():
         if not text.strip():
             return jsonify({"error": "OCR failed"})
 
-        # PII
+        # PII Detection
         pii = detect_pii(text)
 
-        # MASK
+        # Masking
         masked_text = mask_pii(text, pii)
 
-        # AI
+        # AI Detection
         ai = detect_ai_entities(text)
 
-        # DOCUMENT TYPE
+        # Document Type
         doc_type = classify_document(text)
 
-        # RISK
+        # Risk Calculation
         score = (
             len(pii["aadhaar"]) * 5 +
             len(pii["pan"]) * 4 +
@@ -90,19 +94,20 @@ def upload_file():
             len(pii["dob"]) * 2
         )
 
-        risk = "LOW"
         if score >= 8:
             risk = "HIGH"
         elif score >= 4:
             risk = "MEDIUM"
+        else:
+            risk = "LOW"
 
-        # OUTPUT FILE
+        # Create Output PDF
         output_name = os.path.splitext(filename)[0] + "_masked.pdf"
         output_path = os.path.join(UPLOAD_FOLDER, output_name)
 
         create_pdf(masked_text, output_path)
 
-        # 🔥 IMPORTANT FIX (dynamic URL)
+        # Dynamic URL (works in deployment)
         base_url = request.host_url
 
         return jsonify({
