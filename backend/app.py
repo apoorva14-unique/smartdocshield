@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 import os
 from werkzeug.utils import secure_filename
@@ -11,18 +11,16 @@ from ai_detector import detect_ai_entities
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 
-# 🔐 LOGIN IMPORT
+# 🔐 LOGIN
 from auth import auth
 
 app = Flask(__name__)
 CORS(app)
 
-# 🔐 REGISTER LOGIN ROUTES
 app.register_blueprint(auth)
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
 
 # -------- CREATE PDF --------
 def create_pdf(text, path):
@@ -36,12 +34,14 @@ def create_pdf(text, path):
 
     doc.build(content)
 
-
-# -------- HOME --------
+# -------- SERVE FRONTEND --------
 @app.route("/")
-def home():
-    return "✅ SmartDocShield Backend Running"
+def serve_frontend():
+    return send_from_directory("../frontend", "index.html")
 
+@app.route("/<path:path>")
+def static_files(path):
+    return send_from_directory("../frontend", path)
 
 # -------- DOCUMENT TYPE --------
 def classify_document(text):
@@ -53,7 +53,6 @@ def classify_document(text):
         return "PAN Card"
     else:
         return "General Document"
-
 
 # -------- UPLOAD --------
 @app.route("/upload", methods=["POST"])
@@ -103,6 +102,9 @@ def upload_file():
 
         create_pdf(masked_text, output_path)
 
+        # 🔥 IMPORTANT FIX (dynamic URL)
+        base_url = request.host_url
+
         return jsonify({
             "masked_text": masked_text,
             "pii": pii,
@@ -110,12 +112,11 @@ def upload_file():
             "risk": risk,
             "file_type": filename.split(".")[-1],
             "doc_type": doc_type,
-            "download_url": f"http://127.0.0.1:5000/download/{output_name}"
+            "download_url": f"{base_url}download/{output_name}"
         })
 
     except Exception as e:
         return jsonify({"error": str(e)})
-
 
 # -------- DOWNLOAD --------
 @app.route("/download/<filename>")
@@ -127,6 +128,7 @@ def download(filename):
 
     return send_file(path, as_attachment=True)
 
-
+# -------- RUN --------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
