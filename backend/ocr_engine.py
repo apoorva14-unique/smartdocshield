@@ -6,15 +6,19 @@ import re
 from pdf2image import convert_from_path
 import os
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+# ---------------- ENV DETECTION ----------------
+IS_RENDER = os.environ.get("RENDER", False)
 
-POPPLER_PATH = r"C:\Users\Lenovo\Downloads\Release-25.12.0-0 (2)\poppler-25.12.0\Library\bin"
+# ---------------- TESSERACT CONFIG ----------------
+if not IS_RENDER:
+    # LOCAL WINDOWS PATH
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
-
+# ---------------- TEXT CLEANING ----------------
 def clean_text(text):
     text = text.upper()
 
-    # fix common OCR mistakes
+    # Fix common OCR mistakes
     text = text.replace("O", "0")
     text = text.replace("I", "1")
 
@@ -23,7 +27,7 @@ def clean_text(text):
 
     return text.strip()
 
-
+# ---------------- MAIN OCR FUNCTION ----------------
 def extract_text(filepath):
 
     text = ""
@@ -31,42 +35,58 @@ def extract_text(filepath):
     try:
         ext = filepath.lower()
 
-        # IMAGE
+        # ---------------- IMAGE ----------------
         if ext.endswith((".jpg", ".png", ".jpeg")):
             img = Image.open(filepath)
             text = pytesseract.image_to_string(img)
 
-        # PDF
+        # ---------------- PDF ----------------
         elif ext.endswith(".pdf"):
 
-            # Try direct extraction
+            # STEP 1: Try direct text extraction
             try:
                 with open(filepath, "rb") as f:
                     reader = PyPDF2.PdfReader(f)
                     for page in reader.pages:
                         if page.extract_text():
                             text += page.extract_text()
-            except:
-                pass
+            except Exception as e:
+                print("PDF READ ERROR:", e)
 
-            # 🔥 If empty → OCR
+            # STEP 2: If no text → OCR fallback
             if not text.strip():
-                images = convert_from_path(filepath, poppler_path=POPPLER_PATH)
+                try:
+                    if IS_RENDER:
+                        # 🚀 Render (no poppler path needed)
+                        images = convert_from_path(filepath)
+                    else:
+                        # 💻 Local (with poppler)
+                        images = convert_from_path(
+                            filepath,
+                            poppler_path=r"C:\Users\Lenovo\Downloads\Release-25.12.0-0 (2)\poppler-25.12.0\Library\bin"
+                        )
 
-                for img in images:
-                    text += pytesseract.image_to_string(img)
+                    for img in images:
+                        text += pytesseract.image_to_string(img)
 
-        # DOCX
+                except Exception as e:
+                    print("PDF OCR ERROR:", e)
+
+        # ---------------- DOCX ----------------
         elif ext.endswith(".docx"):
-            doc = docx.Document(filepath)
+            try:
+                doc = docx.Document(filepath)
 
-            for para in doc.paragraphs:
-                text += para.text + "\n"
+                for para in doc.paragraphs:
+                    text += para.text + "\n"
 
-            for table in doc.tables:
-                for row in table.rows:
-                    for cell in row.cells:
-                        text += cell.text + " "
+                for table in doc.tables:
+                    for row in table.rows:
+                        for cell in row.cells:
+                            text += cell.text + " "
+
+            except Exception as e:
+                print("DOCX ERROR:", e)
 
         else:
             return ""
