@@ -8,3 +8,4 @@ pillow
 spacy
 pdf2image
 PyPDF2
+python-docx
