@@ -2,7 +2,6 @@ from flask import Blueprint, request, jsonify
 
 auth = Blueprint("auth", __name__)
 
-# Dummy user (you can upgrade later to DB)
 USER = {
     "username": "admin",
     "password": "1234"
@@ -10,9 +9,14 @@ USER = {
 
 @auth.route("/login", methods=["POST"])
 def login():
-    data = request.json
+    data = request.get_json()
 
-    if data["username"] == USER["username"] and data["password"] == USER["password"]:
-        return jsonify({"status": "success", "message": "Login successful"})
-    
-    return jsonify({"status": "fail", "message": "Invalid credentials"})
+    print("LOGIN:", data)
+
+    if data.get("username") == USER["username"] and data.get("password") == USER["password"]:
+        return jsonify({"status": "success"})
+    else:
+        return jsonify({
+            "status": "fail",
+            "message": "Invalid username or password"
+        })

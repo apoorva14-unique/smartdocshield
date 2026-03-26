@@ -34,7 +34,7 @@ async function login() {
 
     if (data.status === "success") {
         localStorage.setItem("loggedIn", "true");
-        window.location.href = "index.html";
+        window.location.href = "/index";
     } else {
         document.getElementById("loginMsg").innerText = data.message;
     }
