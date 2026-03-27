@@ -1,21 +1,26 @@
 import spacy
 import re
 
-nlp = spacy.load("en_core_web_sm")
+try:
+    nlp = spacy.load("en_core_web_sm")
+except:
+    nlp = None
 
 STOPWORDS = ["GOVERNMENT", "INDIA", "UNIQUE", "AUTHORITY"]
 
 def detect_ai_entities(text):
 
-    doc = nlp(text)
-
     names = []
 
-    for ent in doc.ents:
-        val = ent.text.strip()
+    if nlp:
+        doc = nlp(text)
+        for ent in doc.ents:
+            if ent.label_ == "PERSON":
+                names.append(ent.text)
 
-        if ent.label_ == "PERSON" and len(val) > 3:
-            names.append(val)
+    return {
+        "names": list(set(names))[:3]
+    }
 
     # 🔥 BETTER FALLBACK
     if not names:
