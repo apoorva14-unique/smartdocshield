@@ -20,9 +20,16 @@ app = Flask(
     template_folder="../templates",
     static_folder="../static"
 )
+
+@app.route("/dashboard")
+def dashboard():
+    if "user" not in session:
+        return render_template("login.html")
+    return render_template("index.html")
+
 app.secret_key = "supersecretkey"
 
-CORS(app, supports_credentials=True)
+CORS(app, supports_credentials=True, origins=["*"])
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -106,7 +113,10 @@ def upload():
     file.save(filepath)
 
     # 🔍 OCR
-    text = extract_text(filepath)
+    try:
+        text = extract_text(filepath)
+    except:
+        text = "OCR not supported in deployment"
     text = clean_text(text)
 
     # 🧠 AI Detection
