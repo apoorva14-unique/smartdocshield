@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>Login</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
 <style>
 body {
@@ -61,7 +61,7 @@ button {
 <script>
 async function login() {
 
-    const res = await fetch("http://127.0.0.1:5000/login", {
+    const res = await fetch("/login", {
         method:"POST",
         headers:{ "Content-Type":"application/json" },
         credentials:"include",
@@ -74,7 +74,7 @@ async function login() {
     const data = await res.json();
 
     if(data.status==="success"){
-        window.location.href="index.html";
+        window.location.href="/dashboard";
     } else {
         alert("Invalid credentials");
     }
