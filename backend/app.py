@@ -13,6 +13,22 @@ from utils import classify_document, detect_fraud
 from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 
+from flask import Flask, render_template
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+from flask import Flask, render_template
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return render_template('login.html')
+
 app = Flask(__name__)
 
 app.secret_key = "supersecretkey"
