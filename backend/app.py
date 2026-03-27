@@ -14,6 +14,8 @@ from utils import classify_document, detect_fraud
 from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 
+from flask import redirect
+
 # ---- APP INIT ----
 app = Flask(
     __name__,
@@ -24,9 +26,8 @@ app = Flask(
 @app.route("/dashboard")
 def dashboard():
     if "user" not in session:
-        return render_template("login.html")
+        return redirect("/")
     return render_template("index.html")
-
 app.secret_key = "supersecretkey"
 
 CORS(app, supports_credentials=True, origins=["*"])
