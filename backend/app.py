@@ -15,7 +15,11 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 
 # ---- APP INIT ----
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder="../templates",
+    static_folder="../static"
+)
 app.secret_key = "supersecretkey"
 
 CORS(app, supports_credentials=True)
