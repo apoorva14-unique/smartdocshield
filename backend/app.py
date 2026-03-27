@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify, send_file, session
+from flask import Flask, request, jsonify, send_file, session, render_template
 from flask_cors import CORS
 import os
 from werkzeug.utils import secure_filename
 
+# ---- IMPORTS ----
 from ocr_engine import extract_text
 from pii_detector import detect_pii
 from masker import mask_pii
@@ -13,29 +14,11 @@ from utils import classify_document, detect_fraud
 from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 
-from flask import Flask, render_template
-
+# ---- APP INIT ----
 app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return render_template('index.html')
-
-from flask import Flask, render_template
-
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return render_template('login.html')
-
-app = Flask(__name__)
-
 app.secret_key = "supersecretkey"
 
-CORS(app, supports_credentials=True, origins=[
-    "http://127.0.0.1:5500"
-])
+CORS(app, supports_credentials=True)
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -43,13 +26,23 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = False
 
+# ---- USERS ----
+USERS = {
+    "admin": "1234",
+    "sweety": "1234"
+}
 
+# ===============================
+# ✅ HOME ROUTE (FIXED)
+# ===============================
 @app.route("/")
 def home():
-    return "✅ SmartDocShield Backend Running"
+    return render_template("login.html")
 
 
+# ===============================
 # -------- LOGIN --------
+# ===============================
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
@@ -63,11 +56,10 @@ def login():
 
     return jsonify({"status": "fail"})
 
-USERS = {
-    "admin": "1234",
-    "sweety": "1234"
-}
 
+# ===============================
+# -------- REGISTER --------
+# ===============================
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
@@ -76,20 +68,27 @@ def register():
 
     return jsonify({"status": "registered"})
 
+
+# ===============================
 # -------- CHECK AUTH --------
+# ===============================
 @app.route("/check-auth")
 def check_auth():
     return jsonify({"loggedIn": "user" in session})
 
 
+# ===============================
 # -------- LOGOUT --------
+# ===============================
 @app.route("/logout")
 def logout():
     session.clear()
     return jsonify({"status": "logout"})
 
 
+# ===============================
 # -------- UPLOAD --------
+# ===============================
 @app.route("/upload", methods=["POST"])
 def upload():
 
@@ -131,7 +130,7 @@ def upload():
     # 🔥 Fraud Detection
     fraud = detect_fraud(pii)
 
-    # 📄 Generate Better PDF
+    # 📄 Generate PDF
     output_name = filename.split(".")[0] + "_masked.pdf"
     output_path = os.path.join(UPLOAD_FOLDER, output_name)
 
@@ -152,7 +151,7 @@ def upload():
     return jsonify({
         "masked_text": masked_text,
         "pii": pii,
-        "download_url": f"http://127.0.0.1:5000/download/{output_name}",
+        "download_url": f"/download/{output_name}",
         "risk": risk,
         "file_type": filename.split(".")[-1],
         "ai": ai_data,
@@ -160,7 +159,9 @@ def upload():
     })
 
 
+# ===============================
 # -------- DOWNLOAD --------
+# ===============================
 @app.route("/download/<filename>")
 def download(filename):
 
@@ -171,5 +172,8 @@ def download(filename):
     return send_file(path, as_attachment=True)
 
 
+# ===============================
+# -------- RUN --------
+# ===============================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
