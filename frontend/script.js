@@ -1,8 +1,29 @@
-// 🔐 LOGIN CHECK
-if (!localStorage.getItem("loggedIn")) {
-    window.location.href = "login.html";
+// 🔐 CHECK LOGIN
+async function checkLogin() {
+    try {
+        const res = await fetch("http://127.0.0.1:5000/check-auth", {
+            credentials: "include"
+        });
+
+        const data = await res.json();
+
+        if (!data.loggedIn) {
+            window.location.href = "login.html";
+        }
+
+    } catch (err) {
+        console.log("Auth check failed");
+        window.location.href = "login.html";
+    }
 }
 
+checkLogin();
+
+let chart;
+let maskedTextGlobal = "";
+let downloadURL = "";
+
+// ---------------- FILE HANDLING ----------------
 const fileInput = document.getElementById('fileInput');
 const fileNameDisplay = document.getElementById('fileName');
 const dropZone = document.getElementById('dropZone');
@@ -10,16 +31,8 @@ const browseBtn = document.getElementById('browseBtn');
 const vaultList = document.getElementById('vaultList');
 const emptyMsg = document.getElementById('emptyMsg');
 
-let maskedTextGlobal = "";
-let downloadURL = "";
-let chart;
+browseBtn.addEventListener("click", () => fileInput.click());
 
-// ---------------- Browse ----------------
-browseBtn.addEventListener("click", () => {
-    fileInput.click();
-});
-
-// ---------------- Drag & Drop ----------------
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(event => {
     dropZone.addEventListener(event, e => {
         e.preventDefault();
@@ -36,7 +49,6 @@ dropZone.addEventListener('drop', (e) => {
     updateFileName();
 });
 
-// ---------------- File ----------------
 fileInput.addEventListener('change', updateFileName);
 
 function updateFileName() {
@@ -47,17 +59,7 @@ function updateFileName() {
     }
 }
 
-// ---------------- Vault ----------------
-function addToVault(name) {
-    if (emptyMsg) emptyMsg.remove();
-
-    const fileItem = document.createElement('div');
-    fileItem.className = 'file-item';
-    fileItem.innerHTML = `<span>📄 ${name.split('.')[0]}_Masked</span>`;
-    vaultList.prepend(fileItem);
-}
-
-// ---------------- Upload ----------------
+// ---------------- UPLOAD ----------------
 document.getElementById('uploadBtn').addEventListener('click', async () => {
 
     const resultArea = document.getElementById('resultArea');
@@ -77,39 +79,44 @@ document.getElementById('uploadBtn').addEventListener('click', async () => {
     outputText.innerText = '';
 
     try {
-        const response = await fetch('https://smartdocshield.onrender.com/upload', {
+        const response = await fetch('http://127.0.0.1:5000/upload', {
             method: 'POST',
-            body: formData
+            body: formData,
+            credentials: "include"
         });
+
+        // 🔥 Better error handling
+        if (!response.ok) {
+            throw new Error("Server error: " + response.status);
+        }
 
         const data = await response.json();
         loading.style.display = 'none';
 
-        if (data.masked_text) {
+        if (data && data.masked_text) {
 
             maskedTextGlobal = data.masked_text;
             downloadURL = data.download_url;
 
-            let riskColor = "#22c55e";
-            if (data.risk === "MEDIUM") riskColor = "#f59e0b";
-            if (data.risk === "HIGH") riskColor = "#ef4444";
+            const risk = data.risk || "LOW";
+            const fileType = data.file_type ? data.file_type.toUpperCase() : "UNKNOWN";
 
-            const docType = classifyDocument(data.masked_text);
+            let riskColor = "#22c55e";
+            if (risk === "MEDIUM") riskColor = "#f59e0b";
+            if (risk === "HIGH") riskColor = "#ef4444";
 
             const piiSummary = `
-Aadhaar: ${data.pii.aadhaar.length}  
-PAN: ${data.pii.pan.length}  
-Phone: ${data.pii.phone.length}  
-DOB: ${data.pii.dob.length}  
-Email: ${data.pii.email.length}
-            `;
+Aadhaar: ${data.pii?.aadhaar?.length || 0}  
+PAN: ${data.pii?.pan?.length || 0}  
+Bank: ${data.pii?.bank?.length || 0}  
+Card: ${data.pii?.card?.length || 0}  
+DOB: ${data.pii?.dob?.length || 0}
+`;
 
             outputText.innerHTML = `
-🔥 <b>Risk Level:</b> <span style="color:${riskColor}">${data.risk}</span>
+🔥 <b>Risk Level:</b> <span style="color:${riskColor}">${risk}</span>
 
-📂 <b>File Type:</b> ${data.file_type.toUpperCase()}
-
-📑 <b>Document Type:</b> ${docType}
+📂 <b>File Type:</b> ${fileType}
 
 📊 <b>PII Summary:</b>
 ${piiSummary}
@@ -119,40 +126,43 @@ ${highlightMasked(data.masked_text)}
 
 🧠 <b>AI Detection:</b>
 👤 Names: ${data.ai?.names?.join(", ") || "None"}
-📍 Locations: ${data.ai?.locations?.join(", ") || "None"}
 
 🔍 <b>Detected PII:</b>
-${JSON.stringify(data.pii, null, 2)}
+
+Aadhaar: ${data.pii?.aadhaar?.join(", ") || "None"}  
+PAN: ${data.pii?.pan?.join(", ") || "None"}  
+Card: ${data.pii?.card?.join(", ") || "None"}  
+Bank: ${data.pii?.bank?.join(", ") || "None"}  
+DOB: ${data.pii?.dob?.join(", ") || "None"}
             `;
 
-            // ✅ CHART UPDATE
             renderChart(data.pii);
-
-            addToVault(fileInput.files[0].name);
+            addToVault(fileInput.files[0].name, data.download_url);
 
         } else {
-            outputText.innerText = "❌ Error: " + (data.error || "Unknown error");
+            outputText.innerText = "❌ Error: " + (data.error || "Processing failed");
         }
 
     } catch (error) {
         loading.style.display = 'none';
-        outputText.innerText = "❌ Backend not connected.";
+        console.error(error);
+
+        outputText.innerText = "❌ Error: Backend not responding / crashed";
     }
 });
 
-// ---------------- Chart ----------------
+// ---------------- CHART ----------------
 function renderChart(pii) {
 
     const data = {
-        labels: ["Aadhaar", "PAN", "Phone", "DOB", "Email"],
+        labels: ["Aadhaar", "PAN", "Bank", "Card"],
         datasets: [{
-            label: "Detected Count",
+            label: "Detected Sensitive Data",
             data: [
-                pii.aadhaar.length,
-                pii.pan.length,
-                pii.phone.length,
-                pii.dob.length,
-                pii.email.length
+                pii?.aadhaar?.length || 0,
+                pii?.pan?.length || 0,
+                pii?.bank?.length || 0,
+                pii?.card?.length || 0
             ]
         }]
     };
@@ -165,7 +175,27 @@ function renderChart(pii) {
     });
 }
 
-// ---------------- Highlight ----------------
+// ---------------- VAULT ----------------
+function addToVault(name, url) {
+
+    if (emptyMsg) emptyMsg.remove();
+
+    const fileItem = document.createElement('div');
+    fileItem.className = 'file-item';
+
+    fileItem.innerHTML = `
+        <span>📄 ${name}</span>
+        <button onclick="openFile('${url}')">Open</button>
+    `;
+
+    vaultList.prepend(fileItem);
+}
+
+function openFile(url) {
+    window.open(url, "_blank");
+}
+
+// ---------------- HIGHLIGHT ----------------
 function highlightMasked(text) {
 
     text = text.replace(/XXXX/g,
@@ -179,29 +209,24 @@ function highlightMasked(text) {
     return text;
 }
 
-// ---------------- Classifier ----------------
-function classifyDocument(text) {
-
-    const t = text.toUpperCase();
-
-    if (t.includes("AADHAAR") || t.includes("UIDAI"))
-        return "Aadhaar Card";
-
-    if (t.includes("INCOME TAX") || t.includes("PERMANENT ACCOUNT"))
-        return "PAN Card";
-
-    return "General Document";
-}
-
-// ---------------- Copy ----------------
+// ---------------- COPY ----------------
 function copyResult() {
     if (!maskedTextGlobal) return alert("No text to copy!");
     navigator.clipboard.writeText(maskedTextGlobal);
     alert("Copied!");
 }
 
-// ---------------- Download ----------------
+// ---------------- DOWNLOAD ----------------
 function downloadResult() {
     if (!downloadURL) return alert("No file available!");
     window.location.href = downloadURL;
+}
+
+// ---------------- LOGOUT ----------------
+async function logout() {
+    await fetch("http://127.0.0.1:5000/logout", {
+        credentials: "include"
+    });
+
+    window.location.href = "login.html";
 }

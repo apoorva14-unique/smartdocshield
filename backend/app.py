@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, send_from_directory
+from flask import Flask, request, jsonify, send_file, session
 from flask_cors import CORS
 import os
 from werkzeug.utils import secure_filename
@@ -7,124 +7,153 @@ from ocr_engine import extract_text
 from pii_detector import detect_pii
 from masker import mask_pii
 from ai_detector import detect_ai_entities
+from cleaner import clean_text
+from utils import classify_document, detect_fraud
 
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 
-from auth import auth
-
 app = Flask(__name__)
-CORS(app)
 
-app.register_blueprint(auth)
+app.secret_key = "supersecretkey"
+
+CORS(app, supports_credentials=True, origins=[
+    "http://127.0.0.1:5500"
+])
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = False
 
-# -------- CREATE PDF --------
-def create_pdf(text, path):
-    doc = SimpleDocTemplate(path)
-    styles = getSampleStyleSheet()
 
-    content = []
-    for line in text.split("\n"):
-        content.append(Paragraph(line, styles["Normal"]))
-        content.append(Spacer(1, 10))
-
-    doc.build(content)
-
-# -------- SERVE FRONTEND --------
 @app.route("/")
-def serve_frontend():
-    return send_from_directory(FRONTEND_DIR, "login.html")
+def home():
+    return "✅ SmartDocShield Backend Running"
 
-@app.route("/index")
-def serve_index():
-    return send_from_directory(FRONTEND_DIR, "index.html")
 
-@app.route("/<path:path>")
-def static_files(path):
-    return send_from_directory(FRONTEND_DIR, path)
+# -------- LOGIN --------
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.get_json()
 
-# -------- DOCUMENT TYPE --------
-def classify_document(text):
-    t = text.lower()
-    if "aadhaar" in t or "uidai" in t:
-        return "Aadhaar Card"
-    elif "income tax" in t:
-        return "PAN Card"
-    return "General Document"
+    username = data["username"]
+    password = data["password"]
+
+    if username in USERS and USERS[username] == password:
+        session["user"] = username
+        return jsonify({"status": "success"})
+
+    return jsonify({"status": "fail"})
+
+USERS = {
+    "admin": "1234",
+    "sweety": "1234"
+}
+
+@app.route("/register", methods=["POST"])
+def register():
+    data = request.get_json()
+
+    USERS[data["username"]] = data["password"]
+
+    return jsonify({"status": "registered"})
+
+# -------- CHECK AUTH --------
+@app.route("/check-auth")
+def check_auth():
+    return jsonify({"loggedIn": "user" in session})
+
+
+# -------- LOGOUT --------
+@app.route("/logout")
+def logout():
+    session.clear()
+    return jsonify({"status": "logout"})
+
 
 # -------- UPLOAD --------
 @app.route("/upload", methods=["POST"])
-def upload_file():
-    try:
-        file = request.files["file"]
+def upload():
 
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filepath)
+    if "user" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
 
-        text = extract_text(filepath)
+    file = request.files["file"]
 
-        if not text.strip():
-            return jsonify({
-                "error": "No readable text found (Use text-based PDF)"
-            })
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(filepath)
 
-        pii = detect_pii(text)
-        masked_text = mask_pii(text, pii)
-        ai = detect_ai_entities(text)
-        doc_type = classify_document(text)
+    # 🔍 OCR
+    text = extract_text(filepath)
+    text = clean_text(text)
 
-        score = (
-            len(pii["aadhaar"]) * 5 +
-            len(pii["pan"]) * 4 +
-            len(pii["phone"]) * 3 +
-            len(pii["dob"]) * 2
-        )
+    # 🧠 AI Detection
+    ai_data = detect_ai_entities(text)
 
-        if score >= 8:
-            risk = "HIGH"
-        elif score >= 4:
-            risk = "MEDIUM"
-        else:
-            risk = "LOW"
+    # 🔐 PII Detection
+    pii = detect_pii(text)
 
-        output_name = os.path.splitext(filename)[0] + "_masked.pdf"
-        output_path = os.path.join(UPLOAD_FOLDER, output_name)
+    # 🛡️ Masking
+    masked_text = mask_pii(text, pii)
 
-        create_pdf(masked_text, output_path)
+    # 📂 Document Type
+    doc_type = classify_document(text)
 
-        base_url = request.host_url
+    # ⚠️ Risk Calculation
+    total_pii = sum(len(v) for v in pii.values())
 
-        return jsonify({
-            "masked_text": masked_text,
-            "pii": pii,
-            "ai": ai,
-            "risk": risk,
-            "file_type": filename.split(".")[-1],
-            "doc_type": doc_type,
-            "download_url": f"{base_url}download/{output_name}"
-        })
+    if total_pii == 0:
+        risk = "LOW"
+    elif total_pii < 3:
+        risk = "MEDIUM"
+    else:
+        risk = "HIGH"
 
-    except Exception as e:
-        return jsonify({"error": str(e)})
+    # 🔥 Fraud Detection
+    fraud = detect_fraud(pii)
+
+    # 📄 Generate Better PDF
+    output_name = filename.split(".")[0] + "_masked.pdf"
+    output_path = os.path.join(UPLOAD_FOLDER, output_name)
+
+    styles = getSampleStyleSheet()
+    doc = SimpleDocTemplate(output_path)
+
+    content = []
+    content.append(Paragraph("<b>SmartDocShield Protected Document</b>", styles["Title"]))
+    content.append(Paragraph("<br/>", styles["Normal"]))
+    content.append(Paragraph(f"<b>Risk Level:</b> {risk}", styles["Normal"]))
+    content.append(Paragraph("<br/>", styles["Normal"]))
+    content.append(Paragraph(masked_text, styles["Normal"]))
+
+    doc.build(content)
+
+    os.remove(filepath)
+
+    return jsonify({
+        "masked_text": masked_text,
+        "pii": pii,
+        "download_url": f"http://127.0.0.1:5000/download/{output_name}",
+        "risk": risk,
+        "file_type": filename.split(".")[-1],
+        "ai": ai_data,
+        "fraud": fraud
+    })
+
 
 # -------- DOWNLOAD --------
 @app.route("/download/<filename>")
 def download(filename):
+
+    if "user" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
     path = os.path.join(UPLOAD_FOLDER, filename)
-
-    if not os.path.exists(path):
-        return jsonify({"error": "File not found!"})
-
     return send_file(path, as_attachment=True)
 
-# -------- RUN --------
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=10000)

@@ -3,30 +3,54 @@ from PIL import Image
 import PyPDF2
 import docx
 import re
+from pdf2image import convert_from_path
 import platform
+import cv2
+import numpy as np
 
-# -------- AUTO DETECT OS --------
-IS_WINDOWS = platform.system() == "Windows"
-
-if IS_WINDOWS:
+# AUTO CONFIG
+if platform.system() == "Windows":
     pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    POPPLER_PATH = r"C:\Users\Lenovo\Downloads\Release-25.12.0-0 (2)\poppler-25.12.0\Library\bin"
+else:
+    POPPLER_PATH = None
 
 
-# -------- CLEAN TEXT --------
+# 🔥 PREPROCESS IMAGE (STRONG)
+def preprocess_image(path):
+    img = cv2.imread(path)
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # Improve contrast
+    gray = cv2.convertScaleAbs(gray, alpha=2, beta=0)
+
+    # Blur
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+
+    # Threshold
+    thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+
+    return thresh
+
+
+# CLEAN TEXT
 def clean_text(text):
-    text = text.upper()
+    text = text.replace("\n", " ")
 
-    # Fix OCR mistakes
     text = text.replace("O", "0")
     text = text.replace("I", "1")
+    text = text.replace("l", "1")
 
-    text = re.sub(r'[^A-Z0-9\s:/.\-]', ' ', text)
+    text = text.upper()
+
+    text = re.sub(r'[^A-Z0-9:/.\-\s]', ' ', text)
     text = re.sub(r'\s+', ' ', text)
 
     return text.strip()
 
 
-# -------- EXTRACT TEXT --------
+# MAIN OCR
 def extract_text(filepath):
 
     text = ""
@@ -34,56 +58,44 @@ def extract_text(filepath):
     try:
         ext = filepath.lower()
 
-        # -------- IMAGE --------
+        # IMAGE
         if ext.endswith((".jpg", ".png", ".jpeg")):
-            if IS_WINDOWS:
-                img = Image.open(filepath)
-                text = pytesseract.image_to_string(img)
-            else:
-                print("⚠️ OCR not supported on Render for images")
-                return ""
+            processed = preprocess_image(filepath)
 
-        # -------- PDF --------
+            config = '--oem 3 --psm 6'   # 🔥 removed whitelist
+
+            text = pytesseract.image_to_string(processed, config=config)
+
+        # PDF
         elif ext.endswith(".pdf"):
 
-            # ✅ TEXT-BASED PDF (works on Render)
-            try:
-                with open(filepath, "rb") as f:
-                    reader = PyPDF2.PdfReader(f)
-                    for page in reader.pages:
-                        extracted = page.extract_text()
-                        if extracted:
-                            text += extracted
-            except Exception as e:
-                print("PDF TEXT ERROR:", e)
+            with open(filepath, "rb") as f:
+                reader = PyPDF2.PdfReader(f)
+                for page in reader.pages:
+                    extracted = page.extract_text()
+                    if extracted:
+                        text += extracted
 
-            # ❌ OCR fallback only for Windows
-            if not text.strip() and IS_WINDOWS:
-                try:
-                    from pdf2image import convert_from_path
+            if not text.strip():
 
+                if POPPLER_PATH:
+                    images = convert_from_path(filepath, poppler_path=POPPLER_PATH)
+                else:
                     images = convert_from_path(filepath)
 
-                    for img in images:
-                        text += pytesseract.image_to_string(img)
+                for img in images:
+                    img_np = np.array(img)
 
-                except Exception as e:
-                    print("PDF OCR ERROR:", e)
+                    gray = cv2.cvtColor(img_np, cv2.COLOR_BGR2GRAY)
+                    thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
 
-        # -------- DOCX --------
+                    text += pytesseract.image_to_string(thresh, config='--psm 6')
+
+        # DOCX
         elif ext.endswith(".docx"):
             doc = docx.Document(filepath)
-
             for para in doc.paragraphs:
                 text += para.text + "\n"
-
-            for table in doc.tables:
-                for row in table.rows:
-                    for cell in row.cells:
-                        text += cell.text + " "
-
-        else:
-            return ""
 
     except Exception as e:
         print("OCR ERROR:", e)
