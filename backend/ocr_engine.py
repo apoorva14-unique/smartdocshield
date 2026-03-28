@@ -8,40 +8,41 @@ import platform
 import cv2
 import numpy as np
 
-# AUTO CONFIG
+# -------- SAFE OCR CONFIG --------
 if platform.system() == "Windows":
     pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     POPPLER_PATH = r"C:\Users\Lenovo\Downloads\Release-25.12.0-0 (2)\poppler-25.12.0\Library\bin"
 else:
+    # ❌ Render / Linux → no tesseract installed
+    pytesseract.pytesseract.tesseract_cmd = None
     POPPLER_PATH = None
 
 
-# 🔥 PREPROCESS IMAGE (STRONG)
+# -------- PREPROCESS --------
 def preprocess_image(path):
     img = cv2.imread(path)
 
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    if img is None:
+        return None
 
-    # Improve contrast
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     gray = cv2.convertScaleAbs(gray, alpha=2, beta=0)
 
-    # Blur
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
-    # Threshold
-    thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    thresh = cv2.threshold(
+        blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )[1]
 
     return thresh
 
 
-# CLEAN TEXT
+# -------- CLEAN --------
 def clean_text(text):
+    if not text:
+        return ""
+
     text = text.replace("\n", " ")
-
-    text = text.replace("O", "0")
-    text = text.replace("I", "1")
-    text = text.replace("l", "1")
-
     text = text.upper()
 
     text = re.sub(r'[^A-Z0-9:/.\-\s]', ' ', text)
@@ -50,7 +51,7 @@ def clean_text(text):
     return text.strip()
 
 
-# MAIN OCR
+# -------- MAIN OCR --------
 def extract_text(filepath):
 
     text = ""
@@ -58,40 +59,51 @@ def extract_text(filepath):
     try:
         ext = filepath.lower()
 
-        # IMAGE
+        # -------- IMAGE --------
         if ext.endswith((".jpg", ".png", ".jpeg")):
+
             processed = preprocess_image(filepath)
 
-            config = '--oem 3 --psm 6'   # 🔥 removed whitelist
+            if processed is None:
+                return ""
 
-            text = pytesseract.image_to_string(processed, config=config)
+            try:
+                text = pytesseract.image_to_string(
+                    processed, config='--oem 3 --psm 6'
+                )
+            except:
+                print("⚠️ Tesseract not available in deployment")
+                return ""
 
-        # PDF
+        # -------- PDF --------
         elif ext.endswith(".pdf"):
 
-            with open(filepath, "rb") as f:
-                reader = PyPDF2.PdfReader(f)
-                for page in reader.pages:
-                    extracted = page.extract_text()
-                    if extracted:
-                        text += extracted
+            try:
+                with open(filepath, "rb") as f:
+                    reader = PyPDF2.PdfReader(f)
 
+                    for page in reader.pages:
+                        extracted = page.extract_text()
+                        if extracted:
+                            text += extracted
+            except:
+                print("⚠️ PDF read failed")
+
+            # fallback OCR
             if not text.strip():
-
-                if POPPLER_PATH:
-                    images = convert_from_path(filepath, poppler_path=POPPLER_PATH)
-                else:
+                try:
                     images = convert_from_path(filepath)
 
-                for img in images:
-                    img_np = np.array(img)
+                    for img in images:
+                        img_np = np.array(img)
+                        gray = cv2.cvtColor(img_np, cv2.COLOR_BGR2GRAY)
 
-                    gray = cv2.cvtColor(img_np, cv2.COLOR_BGR2GRAY)
-                    thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+                        text += pytesseract.image_to_string(gray)
+                except:
+                    print("⚠️ Poppler/Tesseract missing → skipping OCR")
+                    return ""
 
-                    text += pytesseract.image_to_string(thresh, config='--psm 6')
-
-        # DOCX
+        # -------- DOCX --------
         elif ext.endswith(".docx"):
             doc = docx.Document(filepath)
             for para in doc.paragraphs:
@@ -99,5 +111,6 @@ def extract_text(filepath):
 
     except Exception as e:
         print("OCR ERROR:", e)
+        return ""
 
     return clean_text(text)

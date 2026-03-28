@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, session, render_template
+from flask import Flask, request, jsonify, send_file, session, render_template, redirect
 from flask_cors import CORS
 import os
 from werkzeug.utils import secure_filename
@@ -14,8 +14,6 @@ from utils import classify_document, detect_fraud
 from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 
-from flask import redirect
-
 # ---- APP INIT ----
 app = Flask(
     __name__,
@@ -23,11 +21,6 @@ app = Flask(
     static_folder="../static"
 )
 
-@app.route("/dashboard")
-def dashboard():
-    if "user" not in session:
-        return redirect("/")
-    return render_template("index.html")
 app.secret_key = "supersecretkey"
 
 CORS(app, supports_credentials=True, origins=["*"])
@@ -45,7 +38,7 @@ USERS = {
 }
 
 # ===============================
-# ✅ HOME ROUTE (FIXED)
+# HOME
 # ===============================
 @app.route("/")
 def home():
@@ -53,7 +46,17 @@ def home():
 
 
 # ===============================
-# -------- LOGIN --------
+# DASHBOARD
+# ===============================
+@app.route("/dashboard")
+def dashboard():
+    if "user" not in session:
+        return redirect("/")
+    return render_template("index.html")
+
+
+# ===============================
+# LOGIN
 # ===============================
 @app.route("/login", methods=["POST"])
 def login():
@@ -70,19 +73,17 @@ def login():
 
 
 # ===============================
-# -------- REGISTER --------
+# REGISTER
 # ===============================
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
-
     USERS[data["username"]] = data["password"]
-
     return jsonify({"status": "registered"})
 
 
 # ===============================
-# -------- CHECK AUTH --------
+# CHECK AUTH
 # ===============================
 @app.route("/check-auth")
 def check_auth():
@@ -90,7 +91,7 @@ def check_auth():
 
 
 # ===============================
-# -------- LOGOUT --------
+# LOGOUT
 # ===============================
 @app.route("/logout")
 def logout():
@@ -99,7 +100,7 @@ def logout():
 
 
 # ===============================
-# -------- UPLOAD --------
+# UPLOAD (🔥 FIXED)
 # ===============================
 @app.route("/upload", methods=["POST"])
 def upload():
@@ -113,11 +114,20 @@ def upload():
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     file.save(filepath)
 
-    # 🔍 OCR
+    # 🔍 OCR (SAFE HANDLING)
     try:
         text = extract_text(filepath)
-    except:
-        text = "OCR not supported in deployment"
+    except Exception as e:
+        print("OCR ERROR:", e)
+        text = ""
+
+    # 🔥 IMPORTANT FIX
+    if not text:
+        os.remove(filepath)
+        return jsonify({
+            "error": "OCR failed in deployment (Tesseract not available)"
+        })
+
     text = clean_text(text)
 
     # 🧠 AI Detection
@@ -175,7 +185,7 @@ def upload():
 
 
 # ===============================
-# -------- DOWNLOAD --------
+# DOWNLOAD
 # ===============================
 @app.route("/download/<filename>")
 def download(filename):
@@ -188,7 +198,7 @@ def download(filename):
 
 
 # ===============================
-# -------- RUN --------
+# RUN
 # ===============================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)

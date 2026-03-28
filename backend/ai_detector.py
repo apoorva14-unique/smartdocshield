@@ -18,11 +18,7 @@ def detect_ai_entities(text):
             if ent.label_ == "PERSON":
                 names.append(ent.text)
 
-    return {
-        "names": list(set(names))[:3]
-    }
-
-    # 🔥 BETTER FALLBACK
+    # ✅ fallback ALWAYS runs if empty
     if not names:
         possible = re.findall(r'[A-Z]{3,}\s[A-Z]{3,}', text.upper())
 
