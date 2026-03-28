@@ -199,7 +199,20 @@ def download(filename):
         return jsonify({"error": "Unauthorized"}), 401
 
     path = os.path.join(UPLOAD_FOLDER, filename)
-    return send_file(path, as_attachment=True)
+
+    # ✅ CHECK FILE EXISTS
+    if not os.path.exists(path):
+        return jsonify({
+            "error": "File not found (maybe deleted in server)"
+        }), 404
+
+    try:
+        return send_file(path, as_attachment=True)
+    except Exception as e:
+        print("DOWNLOAD ERROR:", e)
+        return jsonify({
+            "error": "Download failed on server"
+        }), 500
 
 
 # ===============================
