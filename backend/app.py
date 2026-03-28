@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, session, render_template, redirect
+from flask import Flask, request, jsonify, send_file, session, render_template, redirect, send_from_directory
 from flask_cors import CORS
 import os
 from werkzeug.utils import secure_filename
@@ -25,7 +25,8 @@ app.secret_key = "supersecretkey"
 
 CORS(app, supports_credentials=True, origins=["*"])
 
-UPLOAD_FOLDER = "uploads"
+# 🔥 IMPORTANT FIX → ABSOLUTE PATH
+UPLOAD_FOLDER = os.path.join(os.getcwd(), "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -114,14 +115,14 @@ def upload():
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     file.save(filepath)
 
-    # 🔍 OCR (SAFE)
+    # 🔍 OCR
     try:
         text = extract_text(filepath)
     except Exception as e:
         print("OCR ERROR:", e)
         text = ""
 
-    # 🔥 DEMO FALLBACK (VERY IMPORTANT)
+    # 🔥 DEMO FALLBACK
     if not text:
         print("⚠️ Using fallback demo text")
 
@@ -145,9 +146,6 @@ def upload():
     # 🛡️ Masking
     masked_text = mask_pii(text, pii)
 
-    # 📂 Document Type
-    doc_type = classify_document(text)
-
     # ⚠️ Risk
     total_pii = sum(len(v) for v in pii.values())
 
@@ -161,7 +159,7 @@ def upload():
     # 🔥 Fraud Detection
     fraud = detect_fraud(pii)
 
-    # 📄 PDF
+    # 📄 PDF GENERATION
     output_name = filename.split(".")[0] + "_masked.pdf"
     output_path = os.path.join(UPLOAD_FOLDER, output_name)
 
@@ -177,7 +175,11 @@ def upload():
 
     doc.build(content)
 
-    os.remove(filepath)
+    # 🔥 DEBUG PRINT
+    print("Saved file at:", output_path)
+
+    # ❌ DO NOT DELETE FILE (IMPORTANT FIX)
+    # os.remove(filepath)
 
     return jsonify({
         "masked_text": masked_text,
@@ -189,28 +191,29 @@ def upload():
         "fraud": fraud
     })
 
-# ===============================
-# DOWNLOAD
-# ===============================
-from flask import send_from_directory
 
+# ===============================
+# DOWNLOAD (🔥 FINAL FIX)
+# ===============================
 @app.route("/download/<filename>")
 def download(filename):
 
     if "user" not in session:
         return jsonify({"error": "Unauthorized"}), 401
 
+    path = os.path.join(UPLOAD_FOLDER, filename)
+
+    print("Trying to download:", path)
+
+    if not os.path.exists(path):
+        print("❌ FILE NOT FOUND")
+        return jsonify({"error": "File not found on server"}), 404
+
     try:
-        return send_from_directory(
-            directory=UPLOAD_FOLDER,
-            path=filename,
-            as_attachment=True
-        )
+        return send_file(path, as_attachment=True)
     except Exception as e:
         print("DOWNLOAD ERROR:", e)
-        return jsonify({
-            "error": "Download failed on server"
-        }), 500
+        return jsonify({"error": "Download failed on server"}), 500
 
 
 # ===============================
