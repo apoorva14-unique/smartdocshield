@@ -192,22 +192,20 @@ def upload():
 # ===============================
 # DOWNLOAD
 # ===============================
+from flask import send_from_directory
+
 @app.route("/download/<filename>")
 def download(filename):
 
     if "user" not in session:
         return jsonify({"error": "Unauthorized"}), 401
 
-    path = os.path.join(UPLOAD_FOLDER, filename)
-
-    # ✅ CHECK FILE EXISTS
-    if not os.path.exists(path):
-        return jsonify({
-            "error": "File not found (maybe deleted in server)"
-        }), 404
-
     try:
-        return send_file(path, as_attachment=True)
+        return send_from_directory(
+            directory=UPLOAD_FOLDER,
+            path=filename,
+            as_attachment=True
+        )
     except Exception as e:
         print("DOWNLOAD ERROR:", e)
         return jsonify({
