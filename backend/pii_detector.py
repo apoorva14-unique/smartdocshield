@@ -13,12 +13,13 @@ def detect_pii(text):
     pii = {}
 
     # ---------------- AADHAAR (STRONG FIX) ----------------
+    # ---------------- AADHAAR (IMPROVED) ----------------
     aadhaar_matches = []
 
-    # Continuous 12 digits
+# 12 digit continuous
     aadhaar_matches += re.findall(r'\b\d{12}\b', clean)
 
-    # Spaced format
+# spaced format
     aadhaar_matches += re.findall(r'\b\d{4}\s\d{4}\s\d{4}\b', clean)
 
     aadhaar_formatted = []
@@ -27,11 +28,15 @@ def detect_pii(text):
         if len(a) == 12:
             aadhaar_formatted.append(a[:4]+" "+a[4:8]+" "+a[8:])
 
-    # ✅ Keyword validation (VERY IMPORTANT)
-    if "AADHAAR" in clean or "UIDAI" in clean:
+# 🔥 SMART VALIDATION
+    if aadhaar_formatted:
         pii["aadhaar"] = list(set(aadhaar_formatted))
     else:
         pii["aadhaar"] = []
+
+    # If Aadhaar found → ignore PAN false positives
+    if pii["aadhaar"]:
+        pii["pan"] = []
 
     # ---------------- PAN ----------------
     pii["pan"] = list(set(re.findall(r'\b[A-Z]{5}[0-9]{4}[A-Z]\b', clean)))
