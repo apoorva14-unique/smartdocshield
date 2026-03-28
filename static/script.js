@@ -1,19 +1,19 @@
 // 🔐 CHECK LOGIN
 async function checkLogin() {
     try {
-        const res = await fetch("http://127.0.0.1:5000/check-auth", {
+        const res = await fetch("/check-auth", {
             credentials: "include"
         });
 
         const data = await res.json();
 
         if (!data.loggedIn) {
-            window.location.href = "login.html";
+            window.location.href = "/";
         }
 
     } catch (err) {
         console.log("Auth check failed");
-        window.location.href = "login.html";
+        window.location.href = "/";
     }
 }
 
@@ -79,13 +79,12 @@ document.getElementById('uploadBtn').addEventListener('click', async () => {
     outputText.innerText = '';
 
     try {
-        const response = await fetch('http://127.0.0.1:5000/upload', {
+        const response = await fetch('/upload', {
             method: 'POST',
             body: formData,
             credentials: "include"
         });
 
-        // 🔥 Better error handling
         if (!response.ok) {
             throw new Error("Server error: " + response.status);
         }
@@ -224,9 +223,9 @@ function downloadResult() {
 
 // ---------------- LOGOUT ----------------
 async function logout() {
-    await fetch("http://127.0.0.1:5000/logout", {
+    await fetch("/logout", {
         credentials: "include"
     });
 
-    window.location.href = "login.html";
+    window.location.href = "/";
 }
